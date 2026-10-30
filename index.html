@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Sleep Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" />
+  <meta name="theme-color" content="#1a1530" />
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"></div>
+  <div id="stars" class="stars" aria-hidden="true"></div>
+  <div id="dim" class="dim" aria-hidden="true"></div>
+
+  <main>
+    <h1>The Sleep Tool</h1>
+    <p class="sub">Pick a channel or a song, pick a time. Sleep Tight.</p>
+
+    <div class="sky" aria-hidden="true">
+      <div id="moon" class="moon"></div>
+    </div>
+
+    <section>
+      <div class="tabs" role="tablist">
+        <button id="tabChannel" class="tab active" role="tab" aria-selected="true">Channel</button>
+        <button id="tabSong" class="tab" role="tab" aria-selected="false">Song</button>
+        <button id="tabPlaylist" class="tab" role="tab" aria-selected="false">Playlist</button>
+        <button id="tabSpotify" class="tab" role="tab" aria-selected="false">Spotify</button>
+      </div>
+
+      <div class="row">
+        <input id="searchInput" type="search" placeholder="Search for a channel" autocomplete="off" />
+        <button id="searchBtn" class="secondary">Search</button>
+      </div>
+      <p id="searchMsg" class="msg"></p>
+      <ul id="results"></ul>
+
+      <div id="chosen" class="chosen" hidden>
+        <img id="chosenImg" alt="" />
+        <div>
+          <div id="chosenName"></div>
+          <div id="chosenKind" class="kind"></div>
+        </div>
+        <div class="chosenBtns">
+          <button id="favBtn" class="secondary small">☆ Save</button>
+          <button id="shareBtn" class="secondary small">Copy link</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="favSection" hidden>
+      <h2>Favorites</h2>
+      <ul id="favs"></ul>
+    </section>
+
+    <section id="queueSection" hidden>
+      <h2>Queue</h2>
+      <ul id="queue"></ul>
+      <div class="row">
+        <button id="playQueueBtn" class="small">Play queue</button>
+        <button id="clearQueueBtn" class="secondary small">Clear</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Play for</h2>
+      <div class="row">
+        <label>Hours <input id="hours" type="number" min="0" max="12" value="1" /></label>
+        <label>Minutes <input id="minutes" type="number" min="0" max="59" value="30" /></label>
+        <label>Seconds <input id="seconds" type="number" min="0" max="59" value="0" /></label>
+      </div>
+      <div class="presets">
+        <button class="secondary small" data-min="15">15 min</button>
+        <button class="secondary small" data-min="30">30 min</button>
+        <button class="secondary small" data-min="60">60 min</button>
+        <button class="secondary small" data-min="90">90 min</button>
+      </div>
+
+      <div id="channelOptions">
+        <label class="check">Content
+          <select id="contentType">
+            <option value="long">Videos (no Shorts)</option>
+            <option value="shorts">Shorts only</option>
+            <option value="all">Videos and Shorts</option>
+          </select>
+        </label>
+        <label class="check"><input id="shuffle" type="checkbox" checked /> Shuffle videos</label>
+      </div>
+
+      <label class="check">Volume <input id="vol" type="range" min="5" max="100" value="100" /></label>
+      <label class="check">Fade-out
+        <select id="fadeLen">
+          <option value="15">15 seconds</option>
+          <option value="45" selected>45 seconds</option>
+          <option value="120">2 minutes</option>
+        </select>
+      </label>
+      <label class="check"><input id="nightMode" type="checkbox" /> Red night mode</label>
+      <label class="check"><input id="party" type="checkbox" /> Party mode (no fade or goodnight, 0 time = no timer)</label>
+    </section>
+
+    <div class="row">
+      <button id="startBtn" disabled>Start</button>
+      <button id="pauseBtn" class="secondary" hidden>Pause</button>
+      <button id="stopBtn" class="secondary" hidden>Stop</button>
+      <button id="skipBtn" class="secondary" hidden>Skip</button>
+      <button id="plusBtn" class="secondary" hidden>+15 min</button>
+    </div>
+
+    <p id="status" class="status"></p>
+    <p id="history" class="msg"></p>
+
+    <div id="playerWrap" class="playerWrap" hidden></div>
+
+    <section>
+      <h2>Recommended</h2>
+      <div id="recs" class="recs"></div>
+    </section>
+
+    <footer class="foot">Made by Kavish Chanda</footer>
+  </main>
+
+  <div id="goodnight" class="goodnight" hidden>
+    <div class="word">Goodnight.</div>
+    <small>Tap anywhere to wake</small>
+  </div>
+
+  <div class="watermark" aria-hidden="true">Kavish Chanda</div>
+
+  <script src="app.js"></script>
+</body>
+</html>
