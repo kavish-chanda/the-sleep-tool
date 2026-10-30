@@ -667,6 +667,8 @@ document.addEventListener("visibilitychange", () => {
 // ---------- Events ----------
 tabChannel.addEventListener("click", () => setSearchMode("channel"));
 tabSong.addEventListener("click", () => setSearchMode("song"));
+tabPlaylist.addEventListener("click", () => setSearchMode("playlist"));
+tabSpotify.addEventListener("click", () => setSearchMode("spotify"));
 searchBtn.addEventListener("click", search);
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") search();
