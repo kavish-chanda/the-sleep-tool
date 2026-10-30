@@ -1,7 +1,7 @@
 // ====== PASTE YOUR API KEY HERE ======
 const API_KEY = "AIzaSyClMSOxx9UeYnfyXN_9PFkw2qrJag2I-50";
 // Optional: only needed for searching Spotify. Pasting Spotify links works without it.
-const SPOTIFY_CLIENT_ID = "PASTE_SPOTIFY_CLIENT_ID_HERE";
+const SPOTIFY_CLIENT_ID = "280510cb900e4e8abb9484525bf85d47";
 // =====================================
 
 const FADE_SECONDS = 45;        // volume fades out over the last N seconds
