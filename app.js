@@ -1077,7 +1077,7 @@ function createSpotifyPlayer(entry) {
 }
 
 // Login (PKCE, no secret needed) so search works
-const SPOTIFY_REDIRECT = location.href.split(/[?#]/)[0];
+const SPOTIFY_REDIRECT = location.href.split(/[?#]/)[0].replace(/index\.html$/, "");
 
 function randomString(n) {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -1130,7 +1130,7 @@ async function spotifySearch(q) {
   const token = spotifyToken();
   results.innerHTML = "";
   if (!token) {
-    searchMsg.textContent = "Log in to Spotify to search.";
+    searchMsg.textContent = "Log in to Spotify to search. Redirect URI this page uses: " + SPOTIFY_REDIRECT;
     const b = document.createElement("button");
     b.textContent = "Log in with Spotify";
     b.addEventListener("click", () => spotifyLogin(q));
@@ -1148,9 +1148,13 @@ async function spotifySearch(q) {
       sessionStorage.removeItem("sp_token");
       return spotifySearch(q);
     }
-    const data = await res.json();
+    const raw = await res.text();
+    let data = {};
+    try { data = JSON.parse(raw); } catch (e) { /* not JSON */ }
     if (!res.ok) {
-      searchMsg.textContent = "Spotify search failed: " + ((data.error && data.error.message) || res.status);
+      searchMsg.textContent =
+        "Spotify search failed (" + res.status + "): " +
+        ((data.error && data.error.message) || raw.slice(0, 120));
       return;
     }
     const last = (imgs) => ((imgs || []).slice(-1)[0] || {}).url || SPOTIFY_ICON;
@@ -1187,7 +1191,8 @@ async function spotifySearch(q) {
       results.appendChild(li);
     });
   } catch (err) {
-    searchMsg.textContent = "Network error. Check your connection and try again.";
+    console.error(err);
+    searchMsg.textContent = "Spotify search error: " + err.message;
   }
 }
 
