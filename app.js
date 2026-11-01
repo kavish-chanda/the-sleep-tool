@@ -1,7 +1,5 @@
 // ====== PASTE YOUR API KEY HERE ======
 const API_KEY = "AIzaSyClMSOxx9UeYnfyXN_9PFkw2qrJag2I-50";
-// Optional: only needed for searching Spotify. Pasting Spotify links works without it.
-const SPOTIFY_CLIENT_ID = "280510cb900e4e8abb9484525bf85d47";
 // =====================================
 
 const FADE_SECONDS = 45;        // volume fades out over the last N seconds
@@ -143,7 +141,7 @@ function setSearchMode(mode) {
     t.classList.toggle("active", mode === m);
     t.setAttribute("aria-selected", String(mode === m));
   });
-  searchInput.placeholder = mode === "spotify" ? "Paste a Spotify link, or search" : "Search for a " + mode;
+  searchInput.placeholder = mode === "spotify" ? "Paste a Spotify link" : "Search for a " + mode;
   results.innerHTML = "";
   searchMsg.textContent = "";
   searchInput.focus();
@@ -1072,155 +1070,29 @@ function createSpotifyPlayer(entry) {
     (c) => {
       ctrl = c;
       c.addListener("ready", () => c.play()); // if the browser blocks autoplay, tap play once
+      let nudgeAt = 0;
+      c.addListener("playback_update", (e) => {
+        const d = (e && e.data) || {};
+        const ended = d.isPaused && d.duration > 0 && d.position >= d.duration - 1500;
+        if (ended && sessionActive && !paused && Date.now() - nudgeAt > 4000) {
+          nudgeAt = Date.now();
+          // Best effort: ask the embed to carry on with the next song
+          setTimeout(() => { if (sessionActive && !paused) c.resume(); }, 1500);
+        }
+      });
     }
   );
 }
 
-// Login (PKCE, no secret needed) so search works
-const SPOTIFY_REDIRECT = location.href.split(/[?#]/)[0].replace(/index\.html$/, "");
-
-function randomString(n) {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const a = new Uint8Array(n);
-  crypto.getRandomValues(a);
-  return Array.from(a, (b) => chars[b % 62]).join("");
-}
-
-async function sha256b64url(s) {
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return btoa(String.fromCharCode(...new Uint8Array(d)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-async function spotifyLogin(query) {
-  const verifier = randomString(64);
-  sessionStorage.setItem("sp_verifier", verifier);
-  sessionStorage.setItem("sp_query", query || "");
-  const params = new URLSearchParams({
-    client_id: SPOTIFY_CLIENT_ID,
-    response_type: "code",
-    redirect_uri: SPOTIFY_REDIRECT,
-    code_challenge_method: "S256",
-    code_challenge: await sha256b64url(verifier),
-  });
-  location.href = "https://accounts.spotify.com/authorize?" + params.toString();
-}
-
-function spotifyToken() {
-  const t = sessionStorage.getItem("sp_token");
-  const exp = Number(sessionStorage.getItem("sp_exp") || 0);
-  return t && Date.now() < exp ? t : null;
-}
-
-async function spotifySearch(q) {
+// Spotify tab is paste-a-link only (Spotify search needs a Premium developer app)
+function spotifySearch(q) {
   const link = parseSpotifyLink(q);
-  if (link) {
-    searchInput.value = "";
-    results.innerHTML = "";
-    searchMsg.textContent = "";
-    selectEntry(spotifyEntry(link.kind, link.id));
-    return;
-  }
-
-  if (SPOTIFY_CLIENT_ID === "PASTE_SPOTIFY_CLIENT_ID_HERE") {
-    searchMsg.textContent = "Paste a Spotify link, or add your Spotify Client ID at the top of app.js to turn on search.";
-    return;
-  }
-
-  const token = spotifyToken();
   results.innerHTML = "";
-  if (!token) {
-    searchMsg.textContent = "Log in to Spotify to search. Redirect URI this page uses: " + SPOTIFY_REDIRECT;
-    const b = document.createElement("button");
-    b.textContent = "Log in with Spotify";
-    b.addEventListener("click", () => spotifyLogin(q));
-    results.appendChild(b);
+  if (!link) {
+    searchMsg.textContent = "Paste a Spotify link. In Spotify, tap Share, then Copy link.";
     return;
   }
-
-  searchMsg.textContent = "Searching...";
-  try {
-    const res = await fetch(
-      "https://api.spotify.com/v1/search?type=track,playlist&limit=8&q=" + encodeURIComponent(q),
-      { headers: { Authorization: "Bearer " + token } }
-    );
-    if (res.status === 401) {
-      sessionStorage.removeItem("sp_token");
-      return spotifySearch(q);
-    }
-    const raw = await res.text();
-    let data = {};
-    try { data = JSON.parse(raw); } catch (e) { /* not JSON */ }
-    if (!res.ok) {
-      searchMsg.textContent =
-        "Spotify search failed (" + res.status + "): " +
-        ((data.error && data.error.message) || raw.slice(0, 120));
-      return;
-    }
-    const last = (imgs) => ((imgs || []).slice(-1)[0] || {}).url || SPOTIFY_ICON;
-    const items = []
-      .concat(((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) =>
-        spotifyEntry("track", t.id, { title: t.name, sub: t.artists.map((a) => a.name).join(", "), thumb: last(t.album && t.album.images) })))
-      .concat(((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) =>
-        spotifyEntry("playlist", p.id, { title: p.name, sub: "Playlist", thumb: last(p.images) })));
-
-    if (!items.length) {
-      searchMsg.textContent = "Nothing found. Try a different search.";
-      return;
-    }
-    searchMsg.textContent = "";
-    items.forEach((entry, i) => {
-      const li = document.createElement("li");
-      li.tabIndex = 0;
-      li.style.animationDelay = i * 60 + "ms";
-      const img = document.createElement("img");
-      img.src = entry.thumb;
-      img.alt = "";
-      const text = document.createElement("div");
-      const name = document.createElement("div");
-      name.textContent = entry.title;
-      const sub = document.createElement("div");
-      sub.className = "result-sub";
-      sub.textContent = entry.sub;
-      text.append(name, sub);
-      li.append(img, text);
-      li.addEventListener("click", () => selectEntry(entry));
-      li.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectEntry(entry); }
-      });
-      results.appendChild(li);
-    });
-  } catch (err) {
-    console.error(err);
-    searchMsg.textContent = "Spotify search error: " + err.message;
-  }
+  searchInput.value = "";
+  searchMsg.textContent = "";
+  selectEntry(spotifyEntry(link.kind, link.id));
 }
-
-// Back from Spotify's login page: swap the code for a token, then run the pending search
-(async function spotifyFinishLogin() {
-  const code = new URLSearchParams(location.search).get("code");
-  if (!code) return;
-  history.replaceState(null, "", SPOTIFY_REDIRECT + location.hash);
-  setSearchMode("spotify");
-  try {
-    const res = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: SPOTIFY_REDIRECT,
-        client_id: SPOTIFY_CLIENT_ID,
-        code_verifier: sessionStorage.getItem("sp_verifier") || "",
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error_description || res.status);
-    sessionStorage.setItem("sp_token", data.access_token);
-    sessionStorage.setItem("sp_exp", String(Date.now() + (data.expires_in - 60) * 1000));
-    const q = sessionStorage.getItem("sp_query");
-    if (q) { searchInput.value = q; spotifySearch(q); }
-  } catch (err) {
-    searchMsg.textContent = "Spotify login failed: " + err.message;
-  }
-})();
