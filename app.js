@@ -51,6 +51,12 @@ const queueSection = $("queueSection");
 const queueEl = $("queue");
 const playQueueBtn = $("playQueueBtn");
 const clearQueueBtn = $("clearQueueBtn");
+const themeSel = $("themeSel"), autoRed = $("autoRed"), gentleBox = $("gentle"), sceneSel = $("sceneSel");
+const chartEl = $("chart"), streakEl = $("streak"), recentEl = $("recent"), recentSection = $("recentSection");
+const routinesEl = $("routines"), routineName = $("routineName"), codeBox = $("codeBox"), xferMsg = $("xferMsg");
+const breathOn = $("breathOn"), breathBox = $("breathBox"), breathLbl = $("breathLbl");
+const nightClock = $("nightClock"), surpriseBtn = $("surpriseBtn");
+let autoFired = false, breathStart = 0;
 
 let apiReady = false;
 let player = null;
@@ -396,7 +402,22 @@ function onPlayerReady(e) {
   e.target.setLoop(true);
   if (shuffleBox.checked && !usingIdList) e.target.setShuffle(true);
   baseVolume = Number(volEl.value) || 100;
-  e.target.setVolume(baseVolume);
+  if (gentleBox.checked) {
+    e.target.setVolume(0);
+    let v = 0;
+    const ramp = setInterval(() => {
+      v += baseVolume / 20;
+      const ok = player && sessionActive && typeof player.setVolume === "function";
+      if (!ok || v >= baseVolume) {
+        clearInterval(ramp);
+        if (ok) player.setVolume(baseVolume);
+        return;
+      }
+      player.setVolume(v);
+    }, 1000);
+  } else {
+    e.target.setVolume(baseVolume);
+  }
   e.target.playVideo();
 }
 
@@ -574,6 +595,7 @@ function startSession() {
   skipBtn.hidden = false;
   plusBtn.hidden = false;
   statusEl.classList.add("live");
+  if (selected.type !== "queue") pushRecent(selected);
   saveState();
 
   updateMoon(0);
@@ -647,6 +669,7 @@ function endSession() {
 
 function finishSession() {
   endSession();
+  fadeMixer();
   statusEl.textContent = "";
   goodnightEl.hidden = partyRun; // no goodnight screen in party mode
 }
@@ -716,11 +739,13 @@ function saveState() {
     h: hoursInput.value, m: minutesInput.value, s: secondsInput.value,
     content: contentType.value, shuffle: shuffleBox.checked,
     vol: volEl.value, fade: fadeLen.value, night: nightBox.checked,
+    theme: themeSel.value, gentle: gentleBox.checked, auto: autoRed.value, scene: sceneSel.value,
   });
 }
 
 function applyNight() {
   document.body.classList.toggle("red", nightBox.checked);
+  document.body.dataset.theme = nightBox.checked ? "" : themeSel.value;
 }
 
 // Favorites
@@ -789,6 +814,7 @@ function logListening() {
   hist[dayKey()] = (hist[dayKey()] || 0) + ms;
   LS.set("sc_hist", hist);
   renderHistory();
+  renderChart();
 }
 
 function renderHistory() {
@@ -879,6 +905,10 @@ function restore() {
     volEl.value = st.vol || 100;
     fadeLen.value = st.fade || "45";
     nightBox.checked = !!st.night;
+    themeSel.value = st.theme || "amber";
+    gentleBox.checked = !!st.gentle;
+    autoRed.value = st.auto || "";
+    sceneSel.value = st.scene || "none";
   }
   applyNight();
   baseVolume = Number(volEl.value) || 100;
@@ -1096,3 +1126,307 @@ function spotifySearch(q) {
   searchMsg.textContent = "";
   selectEntry(spotifyEntry(link.kind, link.id));
 }
+
+// ---------- Views ----------
+function showView(v) {
+  document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === "view-" + v));
+  document.querySelectorAll("#nav .tab").forEach((b) => {
+    const on = b.dataset.view === v;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+}
+document.querySelectorAll("#nav .tab").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+
+// ---------- Recently played ----------
+function pushRecent(e) {
+  const r = LS.get("sc_recent", []).filter((x) => !(x.id === e.id && x.type === e.type));
+  r.unshift(slim(e));
+  LS.set("sc_recent", r.slice(0, 8));
+  renderRecent();
+}
+
+function renderRecent() {
+  const r = LS.get("sc_recent", []);
+  recentSection.hidden = r.length === 0;
+  recentEl.innerHTML = "";
+  r.forEach((f) => {
+    const li = document.createElement("li");
+    const img = document.createElement("img");
+    img.src = f.thumb;
+    img.alt = "";
+    const name = document.createElement("span");
+    name.textContent = f.title;
+    li.append(img, name);
+    li.addEventListener("click", () => { selectEntry(makeEntry(f)); showView("play"); });
+    recentEl.appendChild(li);
+  });
+}
+
+// ---------- Routines ----------
+function snapshot() {
+  return {
+    sel: selected && selected.type !== "queue" ? slim(selected) : null,
+    h: hoursInput.value, m: minutesInput.value, s: secondsInput.value,
+    content: contentType.value, shuffle: shuffleBox.checked, vol: volEl.value, fade: fadeLen.value,
+    night: nightBox.checked, theme: themeSel.value, gentle: gentleBox.checked,
+  };
+}
+
+function applyState(st) {
+  hoursInput.value = st.h; minutesInput.value = st.m; secondsInput.value = st.s;
+  contentType.value = st.content || "long";
+  shuffleBox.checked = st.shuffle !== false;
+  volEl.value = st.vol || 100;
+  fadeLen.value = st.fade || "45";
+  nightBox.checked = !!st.night;
+  themeSel.value = st.theme || "amber";
+  gentleBox.checked = !!st.gentle;
+  applyNight();
+  paintVol();
+  if (st.sel) selectEntry(makeEntry(st.sel));
+  saveState();
+}
+
+function renderRoutines() {
+  const rs = LS.get("sc_routines", []);
+  routinesEl.innerHTML = "";
+  rs.forEach((r, i) => {
+    const li = document.createElement("li");
+    const name = document.createElement("span");
+    name.textContent = r.name;
+    const rm = document.createElement("button");
+    rm.className = "secondary small";
+    rm.textContent = "\u00d7";
+    rm.setAttribute("aria-label", "Delete routine");
+    rm.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      rs.splice(i, 1);
+      LS.set("sc_routines", rs);
+      renderRoutines();
+    });
+    li.append(name, rm);
+    li.addEventListener("click", () => { applyState(r.state); showView("play"); });
+    routinesEl.appendChild(li);
+  });
+}
+
+$("saveRoutine").addEventListener("click", () => {
+  const name = routineName.value.trim();
+  if (!name) return;
+  const rs = LS.get("sc_routines", []).filter((r) => r.name !== name);
+  rs.push({ name, state: snapshot() });
+  LS.set("sc_routines", rs);
+  routineName.value = "";
+  renderRoutines();
+});
+
+// ---------- Chart and streak ----------
+function renderChart() {
+  const hist = LS.get("sc_hist", {});
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push({ l: "SMTWTFS"[d.getDay()], v: hist[dayKey(d)] || 0 });
+  }
+  const max = Math.max(...days.map((x) => x.v), 1);
+  chartEl.innerHTML = "";
+  days.forEach((x, i) => {
+    const col = document.createElement("div");
+    col.className = "col";
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.height = (x.v / max) * 100 + "%";
+    bar.style.animationDelay = i * 70 + "ms";
+    bar.title = fmtDur(x.v);
+    const lbl = document.createElement("span");
+    lbl.textContent = x.l;
+    col.append(bar, lbl);
+    chartEl.appendChild(col);
+  });
+  let n = 0;
+  const d = new Date();
+  if (!(hist[dayKey(d)] > 0)) d.setDate(d.getDate() - 1);
+  while (hist[dayKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); }
+  streakEl.textContent = n ? `${n}-night streak` : "No streak yet. Use it tonight to start one.";
+}
+
+// ---------- Move favorites and routines between devices ----------
+$("exportBtn").addEventListener("click", () => {
+  const data = { favs: LS.get("sc_favs", []), routines: LS.get("sc_routines", []) };
+  codeBox.value = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  codeBox.select();
+  try { document.execCommand("copy"); xferMsg.textContent = "Code copied. Paste it on your other device."; }
+  catch (e) { xferMsg.textContent = "Copy the code above."; }
+});
+
+$("importBtn").addEventListener("click", () => {
+  try {
+    const d = JSON.parse(decodeURIComponent(escape(atob(codeBox.value.trim()))));
+    const favs = LS.get("sc_favs", []);
+    (d.favs || []).forEach((f) => { if (!favs.some((c) => c.id === f.id && c.type === f.type)) favs.push(f); });
+    const rs = LS.get("sc_routines", []);
+    (d.routines || []).forEach((r) => { if (!rs.some((c) => c.name === r.name)) rs.push(r); });
+    LS.set("sc_favs", favs);
+    LS.set("sc_routines", rs);
+    renderFavs();
+    renderRoutines();
+    xferMsg.textContent = "Imported.";
+  } catch (e) {
+    xferMsg.textContent = "That code didn't work. Make sure you pasted all of it.";
+  }
+});
+
+// ---------- Breathing guide (4-7-8) ----------
+breathOn.addEventListener("change", () => {
+  breathBox.hidden = !breathOn.checked;
+  breathStart = Date.now();
+});
+setInterval(() => {
+  if (breathBox.hidden) return;
+  const t = ((Date.now() - breathStart) / 1000) % 19;
+  breathLbl.textContent = t < 4 ? "Breathe in" : t < 11 ? "Hold" : "Breathe out";
+}, 200);
+
+// ---------- Sound mixer (made in the browser, no files) ----------
+let ac = null;
+const mixGain = {};
+
+function startMixer() {
+  if (ac) { ac.resume(); return; }
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  const n = ac.sampleRate * 3;
+  [["white", null], ["rain", ["bandpass", 2200]], ["deep", ["lowpass", 350]]].forEach(([id, f]) => {
+    const buf = ac.createBuffer(1, n, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1;
+      if (id === "deep") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+      else d[i] = w * 0.6;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    let node = src;
+    if (f) {
+      const fl = ac.createBiquadFilter();
+      fl.type = f[0];
+      fl.frequency.value = f[1];
+      node.connect(fl);
+      node = fl;
+    }
+    const g = ac.createGain();
+    g.gain.value = 0;
+    node.connect(g);
+    g.connect(ac.destination);
+    src.start();
+    mixGain[id] = g;
+  });
+}
+
+[["mixWhite", "white"], ["mixRain", "rain"], ["mixDeep", "deep"]].forEach(([el, id]) => {
+  $(el).addEventListener("input", (e) => {
+    startMixer();
+    mixGain[id].gain.value = (e.target.value / 100) * 0.6;
+  });
+});
+
+function fadeMixer() {
+  if (!ac) return;
+  Object.values(mixGain).forEach((g) => g.gain.setTargetAtTime(0, ac.currentTime, 1.5));
+  ["mixWhite", "mixRain", "mixDeep"].forEach((i) => { $(i).value = 0; });
+}
+
+// ---------- Scenes (rain, snow, fireflies) ----------
+const cv = $("scene");
+const cx = cv.getContext("2d");
+let parts = [];
+let raf = 0;
+
+function sizeScene() { cv.width = innerWidth; cv.height = innerHeight; }
+window.addEventListener("resize", sizeScene);
+
+function setScene(kind) {
+  cancelAnimationFrame(raf);
+  sizeScene();
+  cx.clearRect(0, 0, cv.width, cv.height);
+  if (kind === "none" || reduceMotion) return;
+  const count = kind === "rain" ? 130 : 70;
+  parts = Array.from({ length: count }, () => ({
+    x: Math.random() * cv.width, y: Math.random() * cv.height,
+    v: kind === "rain" ? 9 + Math.random() * 6 : 0.4 + Math.random() * 1.2,
+    r: 1 + Math.random() * 2, p: Math.random() * 6.28,
+  }));
+  const frame = () => {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    parts.forEach((q) => {
+      q.p += 0.02;
+      if (kind === "rain") {
+        q.y += q.v; q.x -= 1.5;
+        cx.strokeStyle = "rgba(170,200,255,0.3)";
+        cx.beginPath(); cx.moveTo(q.x, q.y); cx.lineTo(q.x + 1.5, q.y - 13); cx.stroke();
+      } else if (kind === "snow") {
+        q.y += q.v; q.x += Math.sin(q.p) * 0.6;
+        cx.fillStyle = "rgba(255,255,255,0.7)";
+        cx.beginPath(); cx.arc(q.x, q.y, q.r, 0, 6.28); cx.fill();
+      } else {
+        q.x += Math.sin(q.p) * 0.5; q.y += Math.cos(q.p * 0.8) * 0.4;
+        cx.fillStyle = `rgba(255,230,120,${0.25 + 0.5 * Math.abs(Math.sin(q.p))})`;
+        cx.shadowColor = "rgba(255,230,120,0.9)"; cx.shadowBlur = 12;
+        cx.beginPath(); cx.arc(q.x, q.y, q.r, 0, 6.28); cx.fill();
+        cx.shadowBlur = 0;
+      }
+      if (q.y > cv.height + 10) { q.y = -10; q.x = Math.random() * cv.width; }
+      if (q.x < -10) q.x = cv.width + 10;
+    });
+    raf = requestAnimationFrame(frame);
+  };
+  frame();
+}
+
+// ---------- Settings, shortcuts, clock, auto red mode, surprise ----------
+sceneSel.addEventListener("change", () => { setScene(sceneSel.value); saveState(); });
+themeSel.addEventListener("change", () => { applyNight(); saveState(); });
+gentleBox.addEventListener("change", saveState);
+autoRed.addEventListener("change", () => { autoFired = false; saveState(); });
+
+document.addEventListener("keydown", (e) => {
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === " " && sessionActive) { e.preventDefault(); pauseBtn.click(); }
+  else if (k === "s" && sessionActive) stopBtn.click();
+  else if (k === "n" && sessionActive) skipBtn.click();
+  else if (k === "+" && sessionActive) plusBtn.click();
+});
+
+setInterval(() => {
+  if (!goodnightEl.hidden) {
+    nightClock.textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  if (autoRed.value) {
+    const [h, m] = autoRed.value.split(":").map(Number);
+    const now = new Date();
+    const since = (now.getHours() * 60 + now.getMinutes() - (h * 60 + m) + 1440) % 1440;
+    if (since < 480 && !nightBox.checked && !autoFired) {
+      autoFired = true;
+      nightBox.checked = true;
+      applyNight();
+      saveState();
+    } else if (since >= 480) autoFired = false;
+  }
+}, 1000);
+
+surpriseBtn.addEventListener("click", async () => {
+  const favs = LS.get("sc_favs", []);
+  if (!favs.length) { statusEl.textContent = "Save a favorite first, then Surprise me can pick one."; return; }
+  await selectEntry(makeEntry(favs[Math.floor(Math.random() * favs.length)]));
+  startSession();
+});
+
+applyNight();
+setScene(sceneSel.value);
+renderChart();
+renderRecent();
+renderRoutines();

@@ -14,6 +14,7 @@
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
+  <canvas id="scene" class="scene" aria-hidden="true"></canvas>
   <div id="stars" class="stars" aria-hidden="true"></div>
   <div id="dim" class="dim" aria-hidden="true"></div>
 
@@ -21,117 +22,192 @@
     <h1>The Sleep Tool</h1>
     <p class="sub">Pick a channel or a song, pick a time. Sleep Tight.</p>
 
-    <div class="sky" aria-hidden="true">
-      <div id="moon" class="moon"></div>
+    <div class="sky" aria-hidden="true"><div id="moon" class="moon"></div></div>
+
+    <nav id="nav" class="tabs nav" role="tablist">
+      <button class="tab active" data-view="play" role="tab" aria-selected="true">Play</button>
+      <button class="tab" data-view="library" role="tab" aria-selected="false">Library</button>
+      <button class="tab" data-view="sleep" role="tab" aria-selected="false">Sleep</button>
+      <button class="tab" data-view="settings" role="tab" aria-selected="false">Settings</button>
+    </nav>
+
+    <!-- PLAY -->
+    <div id="view-play" class="view active">
+      <section>
+        <div class="tabs" role="tablist">
+          <button id="tabChannel" class="tab active" role="tab" aria-selected="true">Channel</button>
+          <button id="tabSong" class="tab" role="tab" aria-selected="false">Song</button>
+          <button id="tabPlaylist" class="tab" role="tab" aria-selected="false">Playlist</button>
+          <button id="tabSpotify" class="tab" role="tab" aria-selected="false">Spotify</button>
+        </div>
+        <div class="row">
+          <input id="searchInput" type="search" placeholder="Search for a channel" autocomplete="off" />
+          <button id="searchBtn" class="secondary">Search</button>
+        </div>
+        <p id="searchMsg" class="msg"></p>
+        <ul id="results"></ul>
+        <div id="chosen" class="chosen" hidden>
+          <img id="chosenImg" alt="" />
+          <div><div id="chosenName"></div><div id="chosenKind" class="kind"></div></div>
+          <div class="chosenBtns">
+            <button id="favBtn" class="secondary small">☆ Save</button>
+            <button id="shareBtn" class="secondary small">Copy link</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Play for</h2>
+        <div class="row">
+          <label>Hours <input id="hours" type="number" min="0" max="12" value="1" /></label>
+          <label>Minutes <input id="minutes" type="number" min="0" max="59" value="30" /></label>
+          <label>Seconds <input id="seconds" type="number" min="0" max="59" value="0" /></label>
+        </div>
+        <div class="presets">
+          <button class="secondary small" data-min="15">15 min</button>
+          <button class="secondary small" data-min="30">30 min</button>
+          <button class="secondary small" data-min="60">60 min</button>
+          <button class="secondary small" data-min="90">90 min</button>
+        </div>
+        <div id="channelOptions">
+          <label class="check">Content
+            <select id="contentType">
+              <option value="long">Videos (no Shorts)</option>
+              <option value="shorts">Shorts only</option>
+              <option value="all">Videos and Shorts</option>
+            </select>
+          </label>
+          <label class="check"><input id="shuffle" type="checkbox" checked /> Shuffle videos</label>
+        </div>
+        <label class="check"><input id="party" type="checkbox" /> Party mode (no fade or goodnight, 0 time = no timer)</label>
+      </section>
+
+      <div class="row">
+        <button id="startBtn" disabled>Start</button>
+        <button id="pauseBtn" class="secondary" hidden>Pause</button>
+        <button id="stopBtn" class="secondary" hidden>Stop</button>
+        <button id="skipBtn" class="secondary" hidden>Skip</button>
+        <button id="plusBtn" class="secondary" hidden>+15 min</button>
+        <button id="surpriseBtn" class="secondary">Surprise me</button>
+      </div>
+      <p id="status" class="status"></p>
+      <div id="playerWrap" class="playerWrap" hidden></div>
+
+      <section>
+        <h2>Recommended</h2>
+        <div id="recs" class="recs"></div>
+      </section>
     </div>
 
-    <section>
-      <div class="tabs" role="tablist">
-        <button id="tabChannel" class="tab active" role="tab" aria-selected="true">Channel</button>
-        <button id="tabSong" class="tab" role="tab" aria-selected="false">Song</button>
-        <button id="tabPlaylist" class="tab" role="tab" aria-selected="false">Playlist</button>
-        <button id="tabSpotify" class="tab" role="tab" aria-selected="false">Spotify</button>
-      </div>
-
-      <div class="row">
-        <input id="searchInput" type="search" placeholder="Search for a channel" autocomplete="off" />
-        <button id="searchBtn" class="secondary">Search</button>
-      </div>
-      <p id="searchMsg" class="msg"></p>
-      <ul id="results"></ul>
-
-      <div id="chosen" class="chosen" hidden>
-        <img id="chosenImg" alt="" />
-        <div>
-          <div id="chosenName"></div>
-          <div id="chosenKind" class="kind"></div>
+    <!-- LIBRARY -->
+    <div id="view-library" class="view">
+      <section id="favSection" hidden><h2>Favorites</h2><ul id="favs"></ul></section>
+      <section id="queueSection" hidden>
+        <h2>Queue</h2>
+        <ul id="queue"></ul>
+        <div class="row">
+          <button id="playQueueBtn" class="small">Play queue</button>
+          <button id="clearQueueBtn" class="secondary small">Clear</button>
         </div>
-        <div class="chosenBtns">
-          <button id="favBtn" class="secondary small">☆ Save</button>
-          <button id="shareBtn" class="secondary small">Copy link</button>
+      </section>
+      <section id="recentSection" hidden><h2>Recently played</h2><ul id="recent"></ul></section>
+      <section>
+        <h2>Routines</h2>
+        <div class="row">
+          <input id="routineName" type="search" placeholder="Name this setup, like Rainy night" />
+          <button id="saveRoutine" class="secondary">Save</button>
         </div>
-      </div>
-    </section>
+        <ul id="routines"></ul>
+      </section>
+      <section>
+        <h2>Your nights</h2>
+        <p id="streak" class="status"></p>
+        <div id="chart" class="chart"></div>
+        <p id="history" class="msg"></p>
+      </section>
+      <section>
+        <h2>Move to another device</h2>
+        <div class="row">
+          <button id="exportBtn" class="secondary small">Make code</button>
+          <button id="importBtn" class="secondary small">Import code</button>
+        </div>
+        <textarea id="codeBox" placeholder="Your code appears here. To import, paste a code here and press Import."></textarea>
+        <p id="xferMsg" class="msg"></p>
+      </section>
+    </div>
 
-    <section id="favSection" hidden>
-      <h2>Favorites</h2>
-      <ul id="favs"></ul>
-    </section>
-
-    <section id="queueSection" hidden>
-      <h2>Queue</h2>
-      <ul id="queue"></ul>
-      <div class="row">
-        <button id="playQueueBtn" class="small">Play queue</button>
-        <button id="clearQueueBtn" class="secondary small">Clear</button>
-      </div>
-    </section>
-
-    <section>
-      <h2>Play for</h2>
-      <div class="row">
-        <label>Hours <input id="hours" type="number" min="0" max="12" value="1" /></label>
-        <label>Minutes <input id="minutes" type="number" min="0" max="59" value="30" /></label>
-        <label>Seconds <input id="seconds" type="number" min="0" max="59" value="0" /></label>
-      </div>
-      <div class="presets">
-        <button class="secondary small" data-min="15">15 min</button>
-        <button class="secondary small" data-min="30">30 min</button>
-        <button class="secondary small" data-min="60">60 min</button>
-        <button class="secondary small" data-min="90">90 min</button>
-      </div>
-
-      <div id="channelOptions">
-        <label class="check">Content
-          <select id="contentType">
-            <option value="long">Videos (no Shorts)</option>
-            <option value="shorts">Shorts only</option>
-            <option value="all">Videos and Shorts</option>
+    <!-- SLEEP -->
+    <div id="view-sleep" class="view">
+      <section>
+        <h2>Breathing guide</h2>
+        <label class="check"><input id="breathOn" type="checkbox" /> Show 4-7-8 breathing</label>
+        <div id="breathBox" class="breathBox" hidden>
+          <div class="breath"></div>
+          <div id="breathLbl" class="kind"></div>
+        </div>
+      </section>
+      <section>
+        <h2>Sound mixer</h2>
+        <label class="check">White noise <input id="mixWhite" type="range" min="0" max="100" value="0" /></label>
+        <label class="check">Rain <input id="mixRain" type="range" min="0" max="100" value="0" /></label>
+        <label class="check">Deep rumble <input id="mixDeep" type="range" min="0" max="100" value="0" /></label>
+      </section>
+      <section>
+        <h2>Scene</h2>
+        <label class="check">Backdrop
+          <select id="sceneSel">
+            <option value="none">None</option>
+            <option value="rain">Rain</option>
+            <option value="snow">Snow</option>
+            <option value="fireflies">Fireflies</option>
           </select>
         </label>
-        <label class="check"><input id="shuffle" type="checkbox" checked /> Shuffle videos</label>
-      </div>
-
-      <label class="check">Volume <input id="vol" type="range" min="5" max="100" value="100" /></label>
-      <label class="check">Fade-out
-        <select id="fadeLen">
-          <option value="15">15 seconds</option>
-          <option value="45" selected>45 seconds</option>
-          <option value="120">2 minutes</option>
-        </select>
-      </label>
-      <label class="check"><input id="nightMode" type="checkbox" /> Red night mode</label>
-      <label class="check"><input id="party" type="checkbox" /> Party mode (no fade or goodnight, 0 time = no timer)</label>
-    </section>
-
-    <div class="row">
-      <button id="startBtn" disabled>Start</button>
-      <button id="pauseBtn" class="secondary" hidden>Pause</button>
-      <button id="stopBtn" class="secondary" hidden>Stop</button>
-      <button id="skipBtn" class="secondary" hidden>Skip</button>
-      <button id="plusBtn" class="secondary" hidden>+15 min</button>
+      </section>
     </div>
 
-    <p id="status" class="status"></p>
-    <p id="history" class="msg"></p>
-
-    <div id="playerWrap" class="playerWrap" hidden></div>
-
-    <section>
-      <h2>Recommended</h2>
-      <div id="recs" class="recs"></div>
-    </section>
+    <!-- SETTINGS -->
+    <div id="view-settings" class="view">
+      <section>
+        <h2>Sound</h2>
+        <label class="check">Volume <input id="vol" type="range" min="5" max="100" value="100" /></label>
+        <label class="check">Fade-out
+          <select id="fadeLen">
+            <option value="15">15 seconds</option>
+            <option value="45" selected>45 seconds</option>
+            <option value="120">2 minutes</option>
+          </select>
+        </label>
+        <label class="check"><input id="gentle" type="checkbox" /> Gentle start (fade in over 20 seconds)</label>
+      </section>
+      <section>
+        <h2>Look</h2>
+        <label class="check">Theme
+          <select id="themeSel">
+            <option value="amber">Amber dusk</option>
+            <option value="ocean">Ocean</option>
+            <option value="forest">Forest</option>
+            <option value="midnight">Midnight blue</option>
+          </select>
+        </label>
+        <label class="check"><input id="nightMode" type="checkbox" /> Red night mode</label>
+        <label class="check">Auto red mode from <input id="autoRed" type="time" /></label>
+      </section>
+      <section>
+        <h2>Shortcuts</h2>
+        <p class="msg">Space: pause or resume. S: stop. N: skip. +: add 15 minutes.</p>
+      </section>
+    </div>
 
     <footer class="foot">Made by Kavish Chanda</footer>
   </main>
 
   <div id="goodnight" class="goodnight" hidden>
     <div class="word">Goodnight.</div>
+    <div id="nightClock" class="clock"></div>
     <small>Tap anywhere to wake</small>
   </div>
 
   <div class="watermark" aria-hidden="true">Kavish Chanda</div>
-
   <script src="app.js"></script>
 </body>
 </html>
